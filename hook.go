@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"text/template"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 var tmpl *template.Template
@@ -34,7 +34,7 @@ Fields:
 // Hook represents a Logrus hook to SendGrid. Users should have a valid API
 // key from SendGrid before using this hook.
 type Hook struct {
-	sg          *sendgrid.SGClient
+	sgAPIKey    string
 	serviceName string
 	fromAddr    string
 	toAddr      string
@@ -43,11 +43,10 @@ type Hook struct {
 
 // NewHook creates a new Logrus hook into SendGrid.
 func NewHook(sgAPIKey, serviceName, fromAddr, toAddr string) *Hook {
-	sg := sendgrid.NewSendGridClientWithApiKey(sgAPIKey)
 	levels := []logrus.Level{logrus.WarnLevel, logrus.ErrorLevel, logrus.PanicLevel}
 
 	return &Hook{
-		sg:          sg,
+		sgAPIKey:    sgAPIKey,
 		serviceName: serviceName,
 		fromAddr:    fromAddr,
 		toAddr:      toAddr,
@@ -77,38 +76,19 @@ func (h *Hook) Fire(e *logrus.Entry) error {
 		return errParse
 	}
 
+	from := mail.NewEmail("Clinical Assistant", h.fromAddr)
 	subject := fmt.Sprintf("%s[%s]: %s", h.serviceName, e.Level, e.Message)
+	to := mail.NewEmail("", h.toAddr)
+	content := mail.NewContent("text/plain", string(bodyBuf.Bytes()))
+	m := mail.NewV3MailInit(from, subject, to, content)
 
-	message := sendgrid.NewMail()
-	message.AddTo(h.toAddr)
-	message.SetSubject(subject)
-	message.SetText(string(bodyBuf.Bytes()))
-	message.SetFrom(h.fromAddr)
-
-	errSend := h.sg.Send(message)
+	request := sendgrid.GetRequest(h.sgAPIKey, "/v3/mail/send", "https://api.sendgrid.com")
+	request.Method = "POST"
+	request.Body = mail.GetRequestBody(m)
+	_, errSend := sendgrid.API(request)
 	if errSend != nil {
 		return errSend
 	}
 
 	return nil
-}
-
-func foo() {
-	sendgridKey := os.Getenv("SENDGRID_API_KEY")
-	if sendgridKey == "" {
-		fmt.Println("Environment variable SENDGRID_API_KEY is undefined. Did you forget to source sendgrid.env?")
-		os.Exit(1)
-	}
-	sg := sendgrid.NewSendGridClientWithApiKey(sendgridKey)
-	message := sendgrid.NewMail()
-	message.AddTo("community@sendgrid.com")
-	message.AddToName("SendGrid Community Dev Team")
-	message.SetSubject("SendGrid Testing")
-	message.SetText("WIN")
-	message.SetFrom("you@yourdomain.com")
-	if r := sg.Send(message); r == nil {
-		fmt.Println("Email sent!")
-	} else {
-		fmt.Println(r)
-	}
 }
