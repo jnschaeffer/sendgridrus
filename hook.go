@@ -81,7 +81,7 @@ func (h *Hook) Fire(e *logrus.Entry) error {
 	if len(msg) > 50 {
 		msg = msg[:47] + "..."
 	}
-	subject := fmt.Sprintf("%s[%s]: %s", h.serviceName, e.Level, e.Message)
+	subject := fmt.Sprintf("%s[%s]: %s", h.serviceName, e.Level, msg)
 	to := mail.NewEmail("", h.toAddr)
 	content := mail.NewContent("text/plain", string(bodyBuf.Bytes()))
 	m := mail.NewV3MailInit(from, subject, to, content)
