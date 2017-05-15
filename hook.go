@@ -67,7 +67,7 @@ func (h *Hook) SetLevels(levels []logrus.Level) {
 
 // Fire sends a message on SendGrid from the hook's From user to the hook's To
 // user. Messages have a subject with the format "SERVICE_NAME[LEVEL]: MESSAGE".
-// Each mesasge body contains the message text, log entry time, and fields.
+// Each message body contains the message text, log entry time, and fields.
 func (h *Hook) Fire(e *logrus.Entry) error {
 	var bodyBuf bytes.Buffer
 
@@ -76,7 +76,11 @@ func (h *Hook) Fire(e *logrus.Entry) error {
 		return errParse
 	}
 
-	from := mail.NewEmail("Clinical Assistant", h.fromAddr)
+	from := mail.NewEmail(h.serviceName, h.fromAddr)
+	msg := e.Message
+	if len(msg) > 50 {
+		msg = msg[:47] + "..."
+	}
 	subject := fmt.Sprintf("%s[%s]: %s", h.serviceName, e.Level, e.Message)
 	to := mail.NewEmail("", h.toAddr)
 	content := mail.NewContent("text/plain", string(bodyBuf.Bytes()))
